@@ -26,7 +26,6 @@ use function is_bool;
 use function is_numeric;
 use function is_string;
 use function preg_match;
-use function preg_replace;
 use function sprintf;
 use function str_replace;
 use function stripos;
@@ -231,11 +230,12 @@ class SQLServerPlatform extends AbstractPlatform
 
         return sprintf(
             <<<SQL
-            IF EXISTS (SELECT * FROM sys.sysobjects WHERE name = '%s')
-                ALTER TABLE %s DROP CONSTRAINT %s
-            ELSE
-                DROP INDEX %s ON %s
-            SQL,
+IF EXISTS (SELECT * FROM sysobjects WHERE name = '%s')
+    ALTER TABLE %s DROP CONSTRAINT %s
+ELSE
+    DROP INDEX %s ON %s
+SQL
+            ,
             $index,
             $table,
             $index,
@@ -361,18 +361,21 @@ class SQLServerPlatform extends AbstractPlatform
     protected function getCreateColumnCommentSQL($tableName, $columnName, $comment)
     {
         if (strpos($tableName, '.') !== false) {
-            [$schemaName, $tableName] = explode('.', $tableName, 2);
+            [$schemaSQL, $tableSQL] = explode('.', $tableName);
+            $schemaSQL              = $this->quoteStringLiteral($schemaSQL);
+            $tableSQL               = $this->quoteStringLiteral($tableSQL);
         } else {
-            $schemaName = $this->getDefaultSchemaName();
+            $schemaSQL = "'dbo'";
+            $tableSQL  = $this->quoteStringLiteral($tableName);
         }
 
         return $this->getAddExtendedPropertySQL(
             'MS_Description',
-            (string) $comment,
+            $comment,
             'SCHEMA',
-            $schemaName,
+            $schemaSQL,
             'TABLE',
-            $tableName,
+            $tableSQL,
             'COLUMN',
             $columnName
         );
@@ -719,18 +722,21 @@ class SQLServerPlatform extends AbstractPlatform
     protected function getAlterColumnCommentSQL($tableName, $columnName, $comment)
     {
         if (strpos($tableName, '.') !== false) {
-            [$schemaName, $tableName] = explode('.', $tableName, 2);
+            [$schemaSQL, $tableSQL] = explode('.', $tableName);
+            $schemaSQL              = $this->quoteStringLiteral($schemaSQL);
+            $tableSQL               = $this->quoteStringLiteral($tableSQL);
         } else {
-            $schemaName = $this->getDefaultSchemaName();
+            $schemaSQL = "'dbo'";
+            $tableSQL  = $this->quoteStringLiteral($tableName);
         }
 
         return $this->getUpdateExtendedPropertySQL(
             'MS_Description',
-            (string) $comment,
+            $comment,
             'SCHEMA',
-            $schemaName,
+            $schemaSQL,
             'TABLE',
-            $tableName,
+            $tableSQL,
             'COLUMN',
             $columnName
         );
@@ -755,17 +761,20 @@ class SQLServerPlatform extends AbstractPlatform
     protected function getDropColumnCommentSQL($tableName, $columnName)
     {
         if (strpos($tableName, '.') !== false) {
-            [$schemaName, $tableName] = explode('.', $tableName, 2);
+            [$schemaSQL, $tableSQL] = explode('.', $tableName);
+            $schemaSQL              = $this->quoteStringLiteral($schemaSQL);
+            $tableSQL               = $this->quoteStringLiteral($tableSQL);
         } else {
-            $schemaName = $this->getDefaultSchemaName();
+            $schemaSQL = "'dbo'";
+            $tableSQL  = $this->quoteStringLiteral($tableName);
         }
 
         return $this->getDropExtendedPropertySQL(
             'MS_Description',
             'SCHEMA',
-            $schemaName,
+            $schemaSQL,
             'TABLE',
-            $tableName,
+            $tableSQL,
             'COLUMN',
             $columnName
         );
@@ -785,22 +794,17 @@ class SQLServerPlatform extends AbstractPlatform
         ];
     }
 
-    private function quoteSingleIdentifierAsStringLiteral(string $levelName): string
-    {
-        return $this->quoteStringLiteral(preg_replace('~^\[|\]$~s', '', $levelName));
-    }
-
     /**
      * Returns the SQL statement for adding an extended property to a database object.
      *
      * @link http://msdn.microsoft.com/en-us/library/ms180047%28v=sql.90%29.aspx
      *
      * @param string      $name       The name of the property to add.
-     * @param string      $value      The value of the property to add.
-     * @param string      $level0Type The type of the object at level 0 the property belongs to.
-     * @param string      $level0Name The name of the object at level 0 the property belongs to.
-     * @param string      $level1Type The type of the object at level 1 the property belongs to.
-     * @param string      $level1Name The name of the object at level 1 the property belongs to.
+     * @param string|null $value      The value of the property to add.
+     * @param string|null $level0Type The type of the object at level 0 the property belongs to.
+     * @param string|null $level0Name The name of the object at level 0 the property belongs to.
+     * @param string|null $level1Type The type of the object at level 1 the property belongs to.
+     * @param string|null $level1Name The name of the object at level 1 the property belongs to.
      * @param string|null $level2Type The type of the object at level 2 the property belongs to.
      * @param string|null $level2Name The name of the object at level 2 the property belongs to.
      *
@@ -808,25 +812,19 @@ class SQLServerPlatform extends AbstractPlatform
      */
     public function getAddExtendedPropertySQL(
         $name,
-        $value,
-        string $level0Type,
-        string $level0Name,
-        string $level1Type,
-        string $level1Name,
-        ?string $level2Type = null,
-        ?string $level2Name = null
+        $value = null,
+        $level0Type = null,
+        $level0Name = null,
+        $level1Type = null,
+        $level1Name = null,
+        $level2Type = null,
+        $level2Name = null
     ) {
-        return 'EXEC sp_addextendedproperty'
-            . ' N' . $this->quoteStringLiteral($name) . ', N' . $this->quoteStringLiteral((string) $value)
-            . ', N' . $this->quoteStringLiteral($level0Type)
-            . ', ' . $this->quoteSingleIdentifierAsStringLiteral($level0Name)
-            . ', N' . $this->quoteStringLiteral($level1Type)
-            . ', ' . $this->quoteSingleIdentifierAsStringLiteral($level1Name)
-            . ($level2Type !== null || $level2Name !== null
-                ? ', N' . $this->quoteStringLiteral((string) $level2Type)
-                  . ', ' . $this->quoteSingleIdentifierAsStringLiteral((string) $level2Name)
-                : ''
-              );
+        return 'EXEC sp_addextendedproperty ' .
+            'N' . $this->quoteStringLiteral($name) . ', N' . $this->quoteStringLiteral((string) $value) . ', ' .
+            'N' . $this->quoteStringLiteral((string) $level0Type) . ', ' . $level0Name . ', ' .
+            'N' . $this->quoteStringLiteral((string) $level1Type) . ', ' . $level1Name . ', ' .
+            'N' . $this->quoteStringLiteral((string) $level2Type) . ', ' . $level2Name;
     }
 
     /**
@@ -835,10 +833,10 @@ class SQLServerPlatform extends AbstractPlatform
      * @link http://technet.microsoft.com/en-gb/library/ms178595%28v=sql.90%29.aspx
      *
      * @param string      $name       The name of the property to drop.
-     * @param string      $level0Type The type of the object at level 0 the property belongs to.
-     * @param string      $level0Name The name of the object at level 0 the property belongs to.
-     * @param string      $level1Type The type of the object at level 1 the property belongs to.
-     * @param string      $level1Name The name of the object at level 1 the property belongs to.
+     * @param string|null $level0Type The type of the object at level 0 the property belongs to.
+     * @param string|null $level0Name The name of the object at level 0 the property belongs to.
+     * @param string|null $level1Type The type of the object at level 1 the property belongs to.
+     * @param string|null $level1Name The name of the object at level 1 the property belongs to.
      * @param string|null $level2Type The type of the object at level 2 the property belongs to.
      * @param string|null $level2Name The name of the object at level 2 the property belongs to.
      *
@@ -846,24 +844,18 @@ class SQLServerPlatform extends AbstractPlatform
      */
     public function getDropExtendedPropertySQL(
         $name,
-        string $level0Type,
-        string $level0Name,
-        string $level1Type,
-        string $level1Name,
-        ?string $level2Type = null,
-        ?string $level2Name = null
+        $level0Type = null,
+        $level0Name = null,
+        $level1Type = null,
+        $level1Name = null,
+        $level2Type = null,
+        $level2Name = null
     ) {
-        return 'EXEC sp_dropextendedproperty'
-            . ' N' . $this->quoteStringLiteral($name)
-            . ', N' . $this->quoteStringLiteral($level0Type)
-            . ', ' . $this->quoteSingleIdentifierAsStringLiteral($level0Name)
-            . ', N' . $this->quoteStringLiteral($level1Type)
-            . ', ' . $this->quoteSingleIdentifierAsStringLiteral($level1Name)
-            . ($level2Type !== null || $level2Name !== null
-                ? ', N' . $this->quoteStringLiteral((string) $level2Type)
-                  . ', ' . $this->quoteSingleIdentifierAsStringLiteral((string) $level2Name)
-                : ''
-              );
+        return 'EXEC sp_dropextendedproperty ' .
+            'N' . $this->quoteStringLiteral($name) . ', ' .
+            'N' . $this->quoteStringLiteral((string) $level0Type) . ', ' . $level0Name . ', ' .
+            'N' . $this->quoteStringLiteral((string) $level1Type) . ', ' . $level1Name . ', ' .
+            'N' . $this->quoteStringLiteral((string) $level2Type) . ', ' . $level2Name;
     }
 
     /**
@@ -872,11 +864,11 @@ class SQLServerPlatform extends AbstractPlatform
      * @link http://msdn.microsoft.com/en-us/library/ms186885%28v=sql.90%29.aspx
      *
      * @param string      $name       The name of the property to update.
-     * @param string      $value      The value of the property to update.
-     * @param string      $level0Type The type of the object at level 0 the property belongs to.
-     * @param string      $level0Name The name of the object at level 0 the property belongs to.
-     * @param string      $level1Type The type of the object at level 1 the property belongs to.
-     * @param string      $level1Name The name of the object at level 1 the property belongs to.
+     * @param string|null $value      The value of the property to update.
+     * @param string|null $level0Type The type of the object at level 0 the property belongs to.
+     * @param string|null $level0Name The name of the object at level 0 the property belongs to.
+     * @param string|null $level1Type The type of the object at level 1 the property belongs to.
+     * @param string|null $level1Name The name of the object at level 1 the property belongs to.
      * @param string|null $level2Type The type of the object at level 2 the property belongs to.
      * @param string|null $level2Name The name of the object at level 2 the property belongs to.
      *
@@ -884,25 +876,19 @@ class SQLServerPlatform extends AbstractPlatform
      */
     public function getUpdateExtendedPropertySQL(
         $name,
-        $value,
-        string $level0Type,
-        string $level0Name,
-        string $level1Type,
-        string $level1Name,
-        ?string $level2Type = null,
-        ?string $level2Name = null
+        $value = null,
+        $level0Type = null,
+        $level0Name = null,
+        $level1Type = null,
+        $level1Name = null,
+        $level2Type = null,
+        $level2Name = null
     ) {
-        return 'EXEC sp_updateextendedproperty'
-            . ' N' . $this->quoteStringLiteral($name) . ', N' . $this->quoteStringLiteral((string) $value)
-            . ', N' . $this->quoteStringLiteral($level0Type)
-            . ', ' . $this->quoteSingleIdentifierAsStringLiteral($level0Name)
-            . ', N' . $this->quoteStringLiteral($level1Type)
-            . ', ' . $this->quoteSingleIdentifierAsStringLiteral($level1Name)
-            . ($level2Type !== null || $level2Name !== null
-                ? ', N' . $this->quoteStringLiteral((string) $level2Type)
-                  . ', ' . $this->quoteSingleIdentifierAsStringLiteral((string) $level2Name)
-                : ''
-              );
+        return 'EXEC sp_updateextendedproperty ' .
+            'N' . $this->quoteStringLiteral($name) . ', N' . $this->quoteStringLiteral((string) $value) . ', ' .
+            'N' . $this->quoteStringLiteral((string) $level0Type) . ', ' . $level0Name . ', ' .
+            'N' . $this->quoteStringLiteral((string) $level1Type) . ', ' . $level1Name . ', ' .
+            'N' . $this->quoteStringLiteral((string) $level2Type) . ', ' . $level2Name;
     }
 
     /**
@@ -920,9 +906,7 @@ class SQLServerPlatform extends AbstractPlatform
     {
         // "sysdiagrams" table must be ignored as it's internal SQL Server table for Database Diagrams
         // Category 2 must be ignored as it is "MS SQL Server 'pseudo-system' object[s]" for replication
-        return 'SELECT name FROM sys.sysobjects'
-            . ' WHERE type = \'U\' AND name != \'sysdiagrams\' AND category != 2'
-            . ' ORDER BY name';
+        return "SELECT name FROM sysobjects WHERE type = 'U' AND name != 'sysdiagrams' AND category != 2 ORDER BY name";
     }
 
     /**
@@ -1019,7 +1003,7 @@ class SQLServerPlatform extends AbstractPlatform
      */
     public function getListViewsSQL($database)
     {
-        return "SELECT name FROM sys.sysobjects WHERE type = 'V' ORDER BY name";
+        return "SELECT name FROM sysobjects WHERE type = 'V' ORDER BY name";
     }
 
     /**
@@ -1703,19 +1687,15 @@ class SQLServerPlatform extends AbstractPlatform
 
     protected function getCommentOnTableSQL(string $tableName, ?string $comment): string
     {
-        if (strpos($tableName, '.') !== false) {
-            [$schemaName, $tableName] = explode('.', $tableName, 2);
-        } else {
-            $schemaName = $this->getDefaultSchemaName();
-        }
-
-        return $this->getAddExtendedPropertySQL(
-            'MS_Description',
-            (string) $comment,
-            'SCHEMA',
-            $schemaName,
-            'TABLE',
-            $tableName
+        return sprintf(
+            <<<'SQL'
+EXEC sys.sp_addextendedproperty @name=N'MS_Description',
+  @value=N%s, @level0type=N'SCHEMA', @level0name=N'dbo',
+  @level1type=N'TABLE', @level1name=N%s
+SQL
+            ,
+            $this->quoteStringLiteral((string) $comment),
+            $this->quoteStringLiteral($tableName)
         );
     }
 
@@ -1723,14 +1703,15 @@ class SQLServerPlatform extends AbstractPlatform
     {
         return sprintf(
             <<<'SQL'
-            SELECT
-              p.value AS [table_comment]
-            FROM
-              sys.tables AS tbl
-              INNER JOIN sys.extended_properties AS p ON p.major_id=tbl.object_id AND p.minor_id=0 AND p.class=1
-            WHERE
-              (tbl.name=N%s and SCHEMA_NAME(tbl.schema_id)=N'dbo' and p.name=N'MS_Description')
-            SQL,
+SELECT
+  p.value AS [table_comment]
+FROM
+  sys.tables AS tbl
+  INNER JOIN sys.extended_properties AS p ON p.major_id=tbl.object_id AND p.minor_id=0 AND p.class=1
+WHERE
+  (tbl.name=N%s and SCHEMA_NAME(tbl.schema_id)=N'dbo' and p.name=N'MS_Description')
+SQL
+            ,
             $this->quoteStringLiteral($table)
         );
     }
