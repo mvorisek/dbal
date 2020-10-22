@@ -2,7 +2,6 @@
 
 namespace Doctrine\Tests\DBAL\Functional\Ticket;
 
-use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Schema\Comparator;
 use Doctrine\DBAL\Schema\Table;
 use Doctrine\Tests\DbalFunctionalTestCase;
@@ -14,11 +13,6 @@ use function trim;
 
 class DBAL4283Test extends DbalFunctionalTestCase
 {
-    protected function getConnection(): Connection
-    {
-        return $this->connection;
-    }
-
     /**
      * Quote name with double quotes for data provider.
      */
@@ -33,7 +27,7 @@ class DBAL4283Test extends DbalFunctionalTestCase
     protected function quoteName(string $name): string
     {
         return implode('.', array_map(function ($name) {
-            return $this->getConnection()->getDatabasePlatform()->quoteSingleIdentifier(trim($name, '"'));
+            return $this->connection->getDatabasePlatform()->quoteSingleIdentifier(trim($name, '"'));
         }, explode('.', $name)));
     }
 
@@ -45,7 +39,7 @@ class DBAL4283Test extends DbalFunctionalTestCase
         $table1 = new Table($this->quoteName('dbal4283'));
         $table1->addColumn('id', 'integer');
         $table1->addColumn($columnName, 'integer', ['comment' => 'aaa@email']);
-        $this->getConnection()->getSchemaManager()->dropAndCreateTable($table1);
+        $this->connection->getSchemaManager()->dropAndCreateTable($table1);
 
         self::assertEquals(
             'aaa@email',
@@ -58,7 +52,7 @@ class DBAL4283Test extends DbalFunctionalTestCase
         $table2->addColumn($columnName, 'integer', ['comment' => 'bbb@email']);
         $diffAlterComment = (new Comparator())->diffTable($table1, $table2);
         self::assertNotFalse($diffAlterComment);
-        $this->getConnection()->getSchemaManager()->alterTable($diffAlterComment);
+        $this->connection->getSchemaManager()->alterTable($diffAlterComment);
 
         self::assertEquals(
             'bbb@email',
@@ -71,7 +65,7 @@ class DBAL4283Test extends DbalFunctionalTestCase
         $table3->addColumn($columnName, 'integer');
         $diffDropComment = (new Comparator())->diffTable($table2, $table3);
         self::assertNotFalse($diffDropComment);
-        $this->getConnection()->getSchemaManager()->alterTable($diffDropComment);
+        $this->connection->getSchemaManager()->alterTable($diffDropComment);
 
         self::assertNull(
             $this->connection->getSchemaManager()->listTableDetails('dbal4283')
