@@ -7,9 +7,11 @@ use Doctrine\DBAL\Schema\Table;
 use Doctrine\Tests\DbalFunctionalTestCase;
 
 use function array_map;
-use function explode;
 use function implode;
+use function preg_split;
 use function trim;
+
+use const PREG_SPLIT_NO_EMPTY;
 
 class DBAL4283Test extends DbalFunctionalTestCase
 {
@@ -28,14 +30,16 @@ class DBAL4283Test extends DbalFunctionalTestCase
     {
         return implode('.', array_map(function ($name) {
             return $this->connection->getDatabasePlatform()->quoteSingleIdentifier(trim($name, '"'));
-        }, explode('.', $name)));
+        }, preg_split('~"[^"]*"\s*\K|\.~s', $name, -1, PREG_SPLIT_NO_EMPTY) ?? ['']));
     }
 
     /**
      * @dataProvider columnNameProvider
      */
-    public function testColumnCommnentOperations(string $columnName): void
+    public function testColumnCommnentOperations(string $doubleQuotedColumnName): void
     {
+        $columnName = $this->quoteName($doubleQuotedColumnName);
+
         $table1 = new Table($this->quoteName('dbal4283'));
         $table1->addColumn('id', 'integer');
         $table1->addColumn($columnName, 'integer', ['comment' => 'aaa@email']);
@@ -82,7 +86,8 @@ class DBAL4283Test extends DbalFunctionalTestCase
             ['basic'],
             [$this->doubleQuoteName('basic')],
             [$this->doubleQuoteName('and')],
-            [$this->doubleQuoteName('name-with-dashes')],
+            [$this->doubleQuoteName('name_with-dash')],
+            // not supported by DBAL [$this->doubleQuoteName('name_with.dot')],
         ];
     }
 }

@@ -14,11 +14,11 @@ use InvalidArgumentException;
 
 use function array_merge;
 use function array_unique;
+use function array_unshift;
 use function array_values;
 use function count;
 use function crc32;
 use function dechex;
-use function explode;
 use function func_get_args;
 use function implode;
 use function is_array;
@@ -27,15 +27,17 @@ use function is_numeric;
 use function is_string;
 use function preg_match;
 use function preg_replace;
+use function preg_split;
 use function sprintf;
 use function str_replace;
 use function stripos;
 use function stristr;
 use function strlen;
-use function strpos;
 use function strtoupper;
 use function substr;
 use function substr_count;
+
+use const PREG_SPLIT_NO_EMPTY;
 
 /**
  * The SQLServerPlatform provides the behavior, features and SQL dialect of the
@@ -342,6 +344,21 @@ class SQLServerPlatform extends AbstractPlatform
     }
 
     /**
+     * @param array<string> $parentDefaults
+     *
+     * @return array<string>
+     */
+    private function explodeIndentifier(string $name, array $parentDefaults): array
+    {
+        $res = preg_split('~\[[^\[\]]*\]\s*\K|\.~s', $name, count($parentDefaults) + 1, PREG_SPLIT_NO_EMPTY) ?: [''];
+        for ($i = count($parentDefaults) - count($res); $i >= 0; $i--) {
+            array_unshift($res, $parentDefaults[$i]);
+        }
+
+        return $res;
+    }
+
+    /**
      * Returns the SQL statement for creating a column comment.
      *
      * SQL Server does not support native column comments,
@@ -360,11 +377,7 @@ class SQLServerPlatform extends AbstractPlatform
      */
     protected function getCreateColumnCommentSQL($tableName, $columnName, $comment)
     {
-        if (strpos($tableName, '.') !== false) {
-            [$schemaName, $tableName] = explode('.', $tableName, 2);
-        } else {
-            $schemaName = $this->getDefaultSchemaName();
-        }
+        [$schemaName, $tableName] = $this->explodeIndentifier($tableName, [$this->getDefaultSchemaName()]);
 
         return $this->getAddExtendedPropertySQL(
             'MS_Description',
@@ -718,11 +731,7 @@ class SQLServerPlatform extends AbstractPlatform
      */
     protected function getAlterColumnCommentSQL($tableName, $columnName, $comment)
     {
-        if (strpos($tableName, '.') !== false) {
-            [$schemaName, $tableName] = explode('.', $tableName, 2);
-        } else {
-            $schemaName = $this->getDefaultSchemaName();
-        }
+        [$schemaName, $tableName] = $this->explodeIndentifier($tableName, [$this->getDefaultSchemaName()]);
 
         return $this->getUpdateExtendedPropertySQL(
             'MS_Description',
@@ -754,11 +763,7 @@ class SQLServerPlatform extends AbstractPlatform
      */
     protected function getDropColumnCommentSQL($tableName, $columnName)
     {
-        if (strpos($tableName, '.') !== false) {
-            [$schemaName, $tableName] = explode('.', $tableName, 2);
-        } else {
-            $schemaName = $this->getDefaultSchemaName();
-        }
+        [$schemaName, $tableName] = $this->explodeIndentifier($tableName, [$this->getDefaultSchemaName()]);
 
         return $this->getDropExtendedPropertySQL(
             'MS_Description',
@@ -1033,16 +1038,15 @@ class SQLServerPlatform extends AbstractPlatform
      */
     private function getTableWhereClause($table, $schemaColumn, $tableColumn)
     {
-        if (strpos($table, '.') !== false) {
-            [$schema, $table] = explode('.', $table);
-            $schema           = $this->quoteStringLiteral($schema);
-            $table            = $this->quoteStringLiteral($table);
-        } else {
-            $schema = 'SCHEMA_NAME()';
-            $table  = $this->quoteStringLiteral($table);
-        }
+        [$schema, $table] = $this->explodeIndentifier($table, ['SCHEMA_NAME()']);
 
-        return sprintf('(%s = %s AND %s = %s)', $tableColumn, $table, $schemaColumn, $schema);
+        return sprintf(
+            '(%s = %s AND %s = %s)',
+            $tableColumn,
+            $this->quoteSingleIdentifierAsStringLiteral($table),
+            $schemaColumn,
+            $this->quoteSingleIdentifierAsStringLiteral($schema)
+        );
     }
 
     /**
@@ -1703,11 +1707,7 @@ class SQLServerPlatform extends AbstractPlatform
 
     protected function getCommentOnTableSQL(string $tableName, ?string $comment): string
     {
-        if (strpos($tableName, '.') !== false) {
-            [$schemaName, $tableName] = explode('.', $tableName, 2);
-        } else {
-            $schemaName = $this->getDefaultSchemaName();
-        }
+        [$schemaName, $tableName] = $this->explodeIndentifier($tableName, [$this->getDefaultSchemaName()]);
 
         return $this->getAddExtendedPropertySQL(
             'MS_Description',
