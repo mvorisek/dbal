@@ -56,9 +56,9 @@ class DBAL4283Test extends DbalFunctionalTestCase
         $table2 = new Table($this->quoteName('dbal4283'));
         $table2->addColumn('id', 'integer');
         $table2->addColumn($columnName, 'integer', ['comment' => 'bbb@email']);
-        $diffAlter = (new Comparator())->diffTable($table1, $table2);
-        self::assertNotFalse($diffAlter);
-        $this->getConnection()->getSchemaManager()->alterTable($diffAlter);
+        $diffAlterComment = (new Comparator())->diffTable($table1, $table2);
+        self::assertNotFalse($diffAlterComment);
+        $this->getConnection()->getSchemaManager()->alterTable($diffAlterComment);
 
         self::assertEquals(
             'bbb@email',
@@ -69,9 +69,9 @@ class DBAL4283Test extends DbalFunctionalTestCase
         $table3 = new Table($this->quoteName('dbal4283'));
         $table3->addColumn('id', 'integer');
         $table3->addColumn($columnName, 'integer');
-        $diffDrop = (new Comparator())->diffTable($table2, $table3);
-        self::assertNotFalse($diffDrop);
-        $this->getConnection()->getSchemaManager()->alterTable($diffDrop);
+        $diffDropComment = (new Comparator())->diffTable($table2, $table3);
+        self::assertNotFalse($diffDropComment);
+        $this->getConnection()->getSchemaManager()->alterTable($diffDropComment);
 
         self::assertNull(
             $this->connection->getSchemaManager()->listTableDetails('dbal4283')
