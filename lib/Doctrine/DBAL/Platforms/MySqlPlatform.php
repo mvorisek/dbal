@@ -34,7 +34,7 @@ use function trim;
  *
  * @todo   Rename: MySQLPlatform
  */
-class MySqlPlatform extends AbstractPlatform
+class MySQLPlatform extends AbstractPlatform
 {
     public const LENGTH_LIMIT_TINYTEXT   = 255;
     public const LENGTH_LIMIT_TEXT       = 65535;
