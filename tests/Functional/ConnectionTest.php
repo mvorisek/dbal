@@ -25,6 +25,8 @@ use PDO;
 use Throwable;
 
 use function file_exists;
+use function gc_collect_cycles;
+use function sys_get_temp_dir;
 use function unlink;
 
 class ConnectionTest extends FunctionalTestCase
@@ -35,8 +37,9 @@ class ConnectionTest extends FunctionalTestCase
 
     protected function tearDown(): void
     {
-        if (file_exists('/tmp/test_nesting.sqlite')) {
-            unlink('/tmp/test_nesting.sqlite');
+        if (file_exists(sys_get_temp_dir() . '/test_nesting.sqlite')) {
+            gc_collect_cycles(); // fix "Resource temporarily unavailable" errors on Windows
+            unlink(sys_get_temp_dir() . '/test_nesting.sqlite');
         }
 
         $this->markConnectionNotReusable();
@@ -108,7 +111,7 @@ class ConnectionTest extends FunctionalTestCase
         if ($this->connection->getDatabasePlatform() instanceof SqlitePlatform) {
             $params           = $this->connection->getParams();
             $params['memory'] = false;
-            $params['path']   = '/tmp/test_nesting.sqlite';
+            $params['path']   = sys_get_temp_dir() . '/test_nesting.sqlite';
 
             $connection = DriverManager::getConnection(
                 $params,
