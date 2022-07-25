@@ -12,20 +12,47 @@ class CreateAndDropSchemaObjectsSQLBuilderTest extends FunctionalTestCase
 {
     public function testCreateAndDropTablesWithCircularForeignKeys(): void
     {
-        $schema = new Schema();
-        $this->createTable($schema, 't1', 't2');
-        $this->createTable($schema, 't2', 't1');
+        ob_start();
+        $this->connection->getConfiguration()->setSQLLogger(
+            new class() implements \Doctrine\DBAL\Logging\SQLLogger {
+                public function startQuery($sql, array $params = null, array $types = null): void
+                {
+                    echo "\n" . $sql . "\n\n";
+                }
 
-        $schemaManager = $this->connection->createSchemaManager();
-        $schemaManager->createSchemaObjects($schema);
+                public function stopQuery(): void
+                {
+                }
+            }
+        );
 
-        $this->introspectForeignKey($schemaManager, 't1', 't2');
-        $this->introspectForeignKey($schemaManager, 't2', 't1');
+        try {
+            $schema = new Schema();
+            $this->createTable($schema, 't1', 't2');
+            $this->createTable($schema, 't2', 't1');
 
-        $schemaManager->dropSchemaObjects($schema);
+            $schemaManager = $this->connection->createSchemaManager();
+            $schemaManager->createSchemaObjects($schema);
 
-        self::assertFalse($schemaManager->tablesExist(['t1']));
-        self::assertFalse($schemaManager->tablesExist(['t2']));
+            $this->introspectForeignKey($schemaManager, 't1', 't2');
+            $this->introspectForeignKey($schemaManager, 't2', 't1');
+
+            $schemaManager->dropSchemaObjects($schema);
+
+            self::assertFalse($schemaManager->tablesExist(['t1']));
+            self::assertFalse($schemaManager->tablesExist(['t2']));
+        } catch (\Throwable $e) {
+            $log = ob_get_contents();
+            ob_clean();
+
+            throw new \Error($log, 0, $e);
+        } finally {
+            $conf = $this->connection->getConfiguration();
+            \Closure::bind(static function () use ($conf) {
+                $conf->sqlLogger = null;
+            }, null, \Doctrine\DBAL\Configuration::class)();
+            ob_end_clean();
+        }
     }
 
     private function createTable(Schema $schema, string $name, string $otherName): void
