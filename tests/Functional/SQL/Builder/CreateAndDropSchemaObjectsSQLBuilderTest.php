@@ -27,11 +27,12 @@ class CreateAndDropSchemaObjectsSQLBuilderTest extends FunctionalTestCase
         );
 
         try {
-            $schema = new Schema();
+            $schemaManager = $this->connection->createSchemaManager();
+
+            $schema = $schemaManager->createSchema();
             $this->createTable($schema, 't1', 't2');
             $this->createTable($schema, 't2', 't1');
 
-            $schemaManager = $this->connection->createSchemaManager();
             $schemaManager->createSchemaObjects($schema);
 
             $this->introspectForeignKey($schemaManager, 't1', 't2');
