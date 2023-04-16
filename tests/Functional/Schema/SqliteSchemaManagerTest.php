@@ -50,6 +50,37 @@ class SqliteSchemaManagerTest extends SchemaManagerFunctionalTestCase
         self::assertNotContains('oldname', $tables);
     }
 
+    public function testRenameTableWithAttach(): void
+    {
+        $this->connection->getDatabasePlatform()->disableSchemaEmulation();
+        $this->connection->executeStatement('ATTACH \':memory:\' AS sch');
+
+        $this->connection->getConfiguration()->setSQLLogger(
+            new class() implements \Doctrine\DBAL\Logging\SQLLogger {
+                public function startQuery($sql, array $params = null, array $types = null): void
+                {
+                    echo "\n" . $sql . "\n\n";
+                }
+
+                public function stopQuery(): void
+                {
+                }
+            }
+        );
+try {
+        $this->createTestTable('main.oldname');
+        $this->schemaManager->renameTable('main.oldname', 'sch.newname');
+
+        $tables = $this->schemaManager->listTableNames();
+        self::assertContains('newname', $tables);
+        self::assertNotContains('oldname', $tables);
+}finally {
+            $conf = $this->connection->getConfiguration();
+            \Closure::bind(static function () use ($conf) {
+                $conf->sqlLogger = null;
+            }, null, \Doctrine\DBAL\Configuration::class)();}
+    }
+
     public function createListTableColumns(): Table
     {
         $table = parent::createListTableColumns();

@@ -815,4 +815,9 @@ class SqlitePlatformTest extends AbstractPlatformTestCase
             $this->platform->getCreateTableSQL($table)
         );
     }
+
+    public function testGetCurrentDatabaseExpression(): void
+    {
+        self::assertSame('\'main\'', $this->platform->getCurrentDatabaseExpression());
+    }
 }

@@ -552,9 +552,9 @@ class SqlitePlatform extends AbstractPlatform
      *
      * {@inheritDoc}
      */
-    public function getListTablesSQL()
+    public function getListTablesSQL($database = 'main')
     {
-        return 'SELECT name FROM sqlite_master'
+        return 'SELECT name FROM '.$database.'.sqlite_master'
             . " WHERE type = 'table'"
             . " AND name != 'sqlite_sequence'"
             . " AND name != 'geometry_columns'"
@@ -1095,7 +1095,7 @@ class SqlitePlatform extends AbstractPlatform
                 $sql[] = sprintf(
                     'ALTER TABLE %s RENAME TO %s',
                     $newTable->getQuotedName($this),
-                    $newName->getQuotedName($this)
+                    preg_replace('~.+\.~', '', $newName->getQuotedName($this))
                 );
             }
 
@@ -1176,6 +1176,7 @@ class SqlitePlatform extends AbstractPlatform
             || ! empty($diff->removedForeignKeys)
             || ! empty($diff->removedIndexes)
             || ! empty($diff->renamedIndexes)
+            || ($diff->getNewName() !== false && $diff->getNewName()->getQuotedName($this) !== $diff->getName($this)->getQuotedName($this))
         ) {
             return false;
         }
