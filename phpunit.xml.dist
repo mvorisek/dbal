@@ -27,6 +27,16 @@
             If you want to run them against another DBMS,
             see https://www.doctrine-project.org/projects/doctrine-dbal/en/stable/reference/testing.html#running-integration-tests-locally
         -->
+        <!--<var name="db_event_subscribers" value="Doctrine\DBAL\Event\Listeners\OracleSessionInit">-->
+
+        <!-- Privileged user connection parameters. Used to create and drop the test database -->
+        <var name="db_driver" value="pdo_sqlsrv"/>
+        <var name="db_host" value="127.0.0.1" />
+
+        <var name="db_user" value="sa" />
+        <var name="db_password" value="atk4_pass@Str" />
+        <var name="db_dbname" value="doctrine" />
+        <var name="db_driver_option_TrustServerCertificate" value="1"/>
     </php>
 
     <testsuites>
